@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Shortener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+
+  <header class="gradient-bg text-white py-12 px-4 text-center">
+    <div class="max-w-xl mx-auto">
+      <div class="text-5xl mb-3">🔗</div>
+      <h1 class="text-3xl font-bold tracking-tight">URL Shortener</h1>
+      <p class="mt-2 text-indigo-200 text-sm">Вставь длинную ссылку — получи короткую</p>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto px-4 py-10 space-y-6">
+
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="text-base font-semibold text-slate-700 mb-4">Сократить ссылку</h2>
+
+      <div class="flex gap-2">
+        <input
+          id="urlInput"
+          type="url"
+          placeholder="https://example.com/очень/длинный/путь"
+          class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+        />
+        <button
+          id="shortenBtn"
+          onclick="shortenURL()"
+          class="gradient-bg text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 active:scale-95 transition-all whitespace-nowrap"
+        >
+          Сократить
+        </button>
+      </div>
+
+      <p id="shortenError" class="hidden mt-2 text-red-500 text-sm"></p>
+
+      <div id="resultCard" class="hidden fade-in mt-4 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+        <p class="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Короткая ссылка</p>
+        <div class="flex items-center gap-2">
+          <a id="resultLink" href="#" target="_blank"
+             class="flex-1 text-indigo-700 font-semibold text-base hover:underline truncate"></a>
+          <button id="copyBtn" onclick="copyURL()"
+                  class="flex-shrink-0 bg-white border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-50 transition active:scale-95">
+            Копировать
+          </button>
+        </div>
+        <p class="mt-2 text-xs text-slate-400">
+          Код: <span id="resultCode" class="font-mono text-slate-600"></span>
+          &nbsp;·&nbsp;
+          <button onclick="loadStats(document.getElementById('resultCode').textContent)"
+                  class="text-indigo-500 hover:underline">
+            Статистика →
+          </button>
+        </p>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="text-base font-semibold text-slate-700 mb-4">Статистика</h2>
+
+      <div class="flex gap-2">
+        <input
+          id="statsInput"
+          type="text"
+          placeholder="Код ссылки (например: aB3xY2z)"
+          class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+        />
+        <button
+          onclick="loadStats(document.getElementById('statsInput').value.trim())"
+          class="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-700 active:scale-95 transition-all whitespace-nowrap"
+        >
+          Показать
+        </button>
+      </div>
+
+      <p id="statsError" class="hidden mt-2 text-red-500 text-sm"></p>
+
+      <div id="statsCard" class="hidden fade-in mt-4 border border-slate-100 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-4 py-3 grid grid-cols-2 gap-4">
+          <div>
+            <p class="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Короткая ссылка</p>
+            <a id="statsShortURL" href="#" target="_blank"
+               class="text-indigo-600 font-mono text-sm hover:underline break-all"></a>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Переходов</p>
+            <p id="statsClicks" class="text-3xl font-bold text-slate-800"></p>
+          </div>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-100">
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Оригинальная ссылка</p>
+          <a id="statsOriginal" href="#" target="_blank"
+             class="text-slate-700 text-sm hover:underline break-all"></a>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-100">
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Создана</p>
+          <p id="statsCreated" class="text-sm text-slate-600"></p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 pb-8">
+    Go · PostgreSQL · in-memory cache
+  </footer>
+
+  <script>
+    async function shortenURL() {
+      const input = document.getElementById('urlInput');
+      const url = input.value.trim();
+      const errorEl = document.getElementById('shortenError');
+      const resultCard = document.getElementById('resultCard');
+
+      errorEl.classList.add('hidden');
+      resultCard.classList.add('hidden');
+
+      if (!url) { showErr(errorEl, 'Введите URL'); return; }
+
+      const btn = document.getElementById('shortenBtn');
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showErr(errorEl, data.error || 'Ошибка сервера'); return; }
+
+        document.getElementById('resultLink').textContent = data.short_url;
+        document.getElementById('resultLink').href = data.short_url;
+        document.getElementById('resultCode').textContent = data.short_code;
+        resultCard.classList.remove('hidden');
+      } catch {
+        showErr(errorEl, 'Сервер недоступен');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Сократить';
+      }
+    }
+
+    async function loadStats(code) {
+      if (!code) return;
+      document.getElementById('statsInput').value = code;
+
+      const errorEl = document.getElementById('statsError');
+      const statsCard = document.getElementById('statsCard');
+      errorEl.classList.add('hidden');
+      statsCard.classList.add('hidden');
+
+      try {
+        const res = await fetch(`/api/stats/${encodeURIComponent(code)}`);
+        const data = await res.json();
+        if (!res.ok) { showErr(errorEl, data.error || 'Не найдено'); return; }
+
+        document.getElementById('statsShortURL').textContent = data.short_url;
+        document.getElementById('statsShortURL').href = data.short_url;
+        document.getElementById('statsClicks').textContent = data.clicks;
+        document.getElementById('statsOriginal').textContent = data.original_url;
+        document.getElementById('statsOriginal').href = data.original_url;
+        document.getElementById('statsCreated').textContent = data.created_at;
+        statsCard.classList.remove('hidden');
+        statsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch {
+        showErr(errorEl, 'Сервер недоступен');
+      }
+    }
+
+    async function copyURL() {
+      const url = document.getElementById('resultLink').textContent;
+      const btn = document.getElementById('copyBtn');
+      try {
+        await navigator.clipboard.writeText(url);
+        btn.textContent = 'Скопировано!';
+        btn.classList.add('bg-green-50', 'border-green-300', 'text-green-700');
+        setTimeout(() => {
+          btn.textContent = 'Копировать';
+          btn.classList.remove('bg-green-50', 'border-green-300', 'text-green-700');
+        }, 2000);
+      } catch { btn.textContent = 'Ошибка'; }
+    }
+
+    function showErr(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('urlInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') shortenURL();
+      });
+      document.getElementById('statsInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') loadStats(e.target.value.trim());
+      });
+    });
+  </script>
+</body>
+</html>
